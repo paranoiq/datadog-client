@@ -1,6 +1,10 @@
 {
-    "name": "DataDog/php-datadogstatsd",
+    "name": "paranoiq/datadog-client",
     "type": "library",
-    "description": "This is an extremely simple PHP datadogstatsd client",
-    "keywords": ["DataDog", "PHP"]
+    "description": "An extremely simple PHP DataDog Statsd and events client",
+	"license": "BSD-3-Clause",
+    "keywords": ["DataDog", "PHP"],
+	"require": {
+		"php": ">= 5.3.0"
+	}
 }
