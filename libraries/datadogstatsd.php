@@ -17,6 +17,7 @@ class Datadogstatsd {
     static private $__eventUrl = '/api/v1/events';
     static private $__apiKey;
     static private $__applicationKey;
+    static private $__curlHandler;
 
     /**
      * Log timing information
@@ -103,8 +104,8 @@ class Datadogstatsd {
      * @param string|array $stats The metric(s) to update. Should be either a string or array of metrics.
      * @param int|1 $delta The amount to increment/decrement each metric by.
      * @param float|1 $sampleRate the rate (0-1) for sampling.
-	 * @param array|string $tags Key Value array of Tag => Value, or single tag as string
-	 *
+     * @param array|string $tags Key Value array of Tag => Value, or single tag as string
+     *
      * @return boolean
      **/
     public static function updateStats($stats, $delta = 1, $sampleRate = 1, array $tags = null) {
@@ -127,8 +128,8 @@ class Datadogstatsd {
      * Squirt the metrics over UDP
      * @param array $data Incoming Data
      * @param float|1 $sampleRate the rate (0-1) for sampling.
-	 * @param array|string $tags Key Value array of Tag => Value, or single tag as string
-	 *
+     * @param array|string $tags Key Value array of Tag => Value, or single tag as string
+     *
      * @return null
      **/
     public static function send($data, $sampleRate = 1, array $tags = null) {
@@ -136,7 +137,7 @@ class Datadogstatsd {
         // sampling
         $sampledData = array();
 
-		if ($sampleRate < 1) {
+        if ($sampleRate < 1) {
 
             foreach ($data as $stat => $value) {
 
@@ -144,47 +145,47 @@ class Datadogstatsd {
 
                     $sampledData[$stat] = "$value|@$sampleRate";
 
-				}
+                }
 
-			}
+            }
 
-		} else {
+        } else {
 
             $sampledData = $data;
 
-		}
+        }
 
         if (empty($sampledData)) { return; }
 
-		// Non - Blocking UDP I/O - Use IP Addresses!
-		$socket = socket_create(AF_INET, SOCK_DGRAM, SOL_UDP);
-		socket_set_nonblock($socket);
+        // Non - Blocking UDP I/O - Use IP Addresses!
+        $socket = socket_create(AF_INET, SOCK_DGRAM, SOL_UDP);
+        socket_set_nonblock($socket);
 
         foreach ($sampledData as $stat => $value) {
 
-			if ($tags !== NULL && is_array($tags) && count($tags) > 0) {
+            if ($tags !== NULL && is_array($tags) && count($tags) > 0) {
 
-				$value .= '|';
+                $value .= '|';
 
-				foreach ($tags as $tag_key => $tag_val) {
+                foreach ($tags as $tag_key => $tag_val) {
 
-					$value .= '#' . $tag_key . ':' . $tag_val . ',';
+                    $value .= '#' . $tag_key . ':' . $tag_val . ',';
 
-				}
+                }
 
-				$value = substr($value, 0, -1);
+                $value = substr($value, 0, -1);
 
-			} elseif (isset($tags) && !empty($tags)) {
+            } elseif (isset($tags) && !empty($tags)) {
 
-				$value .= '|#' . $tags;
+                $value .= '|#' . $tags;
 
-			}
+            }
 
-			socket_sendto($socket, "$stat:$value", strlen("$stat:$value"), 0, static::$__server, 8125);
+            socket_sendto($socket, "$stat:$value", strlen("$stat:$value"), 0, static::$__server, 8125);
 
-		}
+        }
 
-		socket_close($socket);
+        socket_close($socket);
 
     }
 
@@ -224,16 +225,41 @@ class Datadogstatsd {
              . '&application_key='    . static::$__applicationKey;
 
         // Set up the http request. Need the PECL pecl_http extension
-        $r = new HttpRequest($url, HttpRequest::METH_POST);
-        $r->addHeaders(array('Content-Type' => 'application/json'));
-        $r->setBody($body);
+        static::sendEvent($url, $body);
+    }
 
-        // Send, suppressing and logging any http errors
-        try {
-            $r->send();
-        } catch (HttpException $ex) {
-            error_log($ex);
+    /**
+     * Sends event asynchronously (without blocking)
+     *
+     * @param string $url
+     * @param string $body
+     * @return null
+     */
+    public static function sendEvent($url, $body) {
+        // create the multiple cURL handle
+        if (!self::$__curlHandler) {
+            self::$__curlHandler = curl_multi_init();
         }
+
+        // create cURL resource
+        $request = curl_init();
+
+        // set URL and other appropriate options
+        curl_setopt($request, CURLOPT_URL, $url);
+        curl_setopt($request, CURLOPT_POST, TRUE);
+        curl_setopt($request, CURLOPT_POSTFIELDS, $body);
+        curl_setopt($request, CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
+
+        // add request
+        curl_multi_add_handle(self::$__curlHandler,$request);
+
+        // execute the request
+        $active = null;
+        do {
+            $mrc = curl_multi_exec(self::$__curlHandler, $active);
+        } while ($mrc == CURLM_CALL_MULTI_PERFORM);
+
+        // do not wait for results
     }
 
 }
