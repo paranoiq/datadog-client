@@ -35,10 +35,10 @@ class StatsdClient
     /**
      * Log timing information
      *
-     * @param string $stats The metric to in log timing info for.
-     * @param float $time The ellapsed time (ms) to log
-     * @param float|1 $sampleRate the rate (0-1) for sampling.
-     **/
+     * @param string - the metric to in log timing info for.
+     * @param float - the ellapsed time (ms) to log
+     * @param float - the rate (0-1) for sampling.
+     */
     public function timing($stat, $time, $sampleRate = 1, array $tags = null)
     {
         $this->send(array($stat => "$time|ms"), $sampleRate, $tags);
@@ -47,11 +47,9 @@ class StatsdClient
     /**
      * Start a timing log
      *
-     * @param  string  $stat       The metric to log timing info for.
-     * @param  float|1 $sampleRate The rate (0-1) for sampling
-     * @param  array  $tags        Optional tags for the metric
-     *
-     * @return void
+     * @param string - the metric to log timing info for.
+     * @param float - the rate (0-1) for sampling
+     * @param array - optional tags for the metric
      */
     public function startTiming($stat, $sampleRate = 1, array $tags = null)
     {
@@ -65,9 +63,7 @@ class StatsdClient
     /**
      * End a timing log and send to statsd
      *
-     * @param  string $stat The metric to log timing info for.
-     *
-     * @return void
+     * @param string - the metric to log timing info for.
      */
     public function endTiming($stat)
     {
@@ -82,10 +78,10 @@ class StatsdClient
     /**
      * Gauge
      *
-     * @param string $stat The metric
-     * @param float $value The value
-     * @param float|1 $sampleRate the rate (0-1) for sampling.
-     **/
+     * @param string - the metric
+     * @param float - the value
+     * @param float - the rate (0-1) for sampling.
+     */
     public function gauge($stat, $value, $sampleRate = 1, array $tags = null)
     {
         $this->send(array($stat => "$value|g"), $sampleRate, $tags);
@@ -94,10 +90,10 @@ class StatsdClient
     /**
      * Histogram
      *
-     * @param string $stat The metric
-     * @param float $value The value
-     * @param float|1 $sampleRate the rate (0-1) for sampling.
-     **/
+     * @param string - the metric
+     * @param float - the value
+     * @param float - the rate (0-1) for sampling.
+     */
     public function histogram($stat, $value, $sampleRate = 1, array $tags = null)
     {
         $this->send(array($stat => "$value|h"), $sampleRate, $tags);
@@ -106,10 +102,10 @@ class StatsdClient
     /**
      * Set
      *
-     * @param string $stat The metric
-     * @param float $value The value
-     * @param float|1 $sampleRate the rate (0-1) for sampling.
-     **/
+     * @param string - the metric
+     * @param float - the value
+     * @param float - the rate (0-1) for sampling.
+     */
     public function set($stat, $value, $sampleRate = 1, array $tags = null)
     {
         $this->send(array($stat => "$value|s"), $sampleRate, $tags);
@@ -119,10 +115,10 @@ class StatsdClient
     /**
      * Increments one or more stats counters
      *
-     * @param string|array $stats The metric(s) to increment.
-     * @param float|1 $sampleRate the rate (0-1) for sampling.
-     * @return boolean
-     **/
+     * @param string|array - the metric(s) to increment.
+     * @param float - the rate (0-1) for sampling.
+     * @return bool
+     */
     public function increment($stats, $sampleRate = 1, array $tags = null)
     {
         $this->updateStats($stats, 1, $sampleRate, $tags);
@@ -131,10 +127,10 @@ class StatsdClient
     /**
      * Decrements one or more stats counters.
      *
-     * @param string|array $stats The metric(s) to decrement.
-     * @param float|1 $sampleRate the rate (0-1) for sampling.
-     * @return boolean
-     **/
+     * @param string|array - the metric(s) to decrement.
+     * @param float - the rate (0-1) for sampling.
+     * @return bool
+     */
     public function decrement($stats, $sampleRate = 1, array $tags = null)
     {
         $this->updateStats($stats, -1, $sampleRate, $tags);
@@ -143,13 +139,12 @@ class StatsdClient
     /**
      * Updates one or more stats counters by arbitrary amounts.
      *
-     * @param string|array $stats The metric(s) to update. Should be either a string or array of metrics.
-     * @param int|1 $delta The amount to increment/decrement each metric by.
-     * @param float|1 $sampleRate the rate (0-1) for sampling.
-     * @param array|string $tags Key Value array of Tag => Value, or single tag as string
-     *
-     * @return boolean
-     **/
+     * @param string|array - the metric(s) to update. Should be either a string or array of metrics.
+     * @param int - the amount to increment/decrement each metric by.
+     * @param float - the rate (0-1) for sampling.
+     * @param array|string - key Value array of Tag => Value, or single tag as string
+     * @return bool
+     */
     public function updateStats($stats, $delta = 1, $sampleRate = 1, array $tags = null)
     {
         if (!is_array($stats)) {
@@ -167,12 +162,11 @@ class StatsdClient
 
     /**
      * Squirt the metrics over UDP
-     * @param array $data Incoming Data
-     * @param float|1 $sampleRate the rate (0-1) for sampling.
-     * @param array|string $tags Key Value array of Tag => Value, or single tag as string
      *
-     * @return null
-     **/
+     * @param array - incoming Data
+     * @param float - the rate (0-1) for sampling.
+     * @param array|string - key-value array of Tag => Value, or single tag as string
+     */
     protected function send($data, $sampleRate = 1, array $tags = null)
     {
         // sampling
@@ -220,11 +214,9 @@ class StatsdClient
      * making many call in a row if you don't want to stall your app.
      * Requires PHP >= 5.3.0 and the PECL extension pecl_http
      *
-     * @param string $title Title of the event
-     * @param array $vals Optional values of the event. See
-     *   http://api.datadoghq.com/events for the valid keys
-     * @return null
-     **/
+     * @param string - Title of the event
+     * @param array - Optional values of the event. See http://api.datadoghq.com/events for the valid keys
+     */
     public function event($title, $vals = array())
     {
         // Assemble the request
@@ -238,7 +230,7 @@ class StatsdClient
             }
         }
 
-        $body = json_encode($vals); // Added in PHP 5.3.0
+        $body = json_encode($vals);
 
         // Get the url to POST to
         $url = $this->datadogHost . $this->eventUrl
@@ -252,9 +244,8 @@ class StatsdClient
     /**
      * Sends event asynchronously (without blocking)
      *
-     * @param string $url
-     * @param string $body
-     * @return null
+     * @param string
+     * @param string
      */
     protected function sendEvent($url, $body) {
         // create the multiple cURL handle
