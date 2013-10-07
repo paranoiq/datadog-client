@@ -8,14 +8,14 @@ namespace DataDog;
  *
  * @author Alex Corley <anthroprose@gmail.com>
  * @author Laurence Roberts <lsjroberts@gmail.com>
- **/
-class StatsdClient
+ */
+class DatadogClient
 {
 
+    private $datadogHost = 'https://app.datadoghq.com';
     private $eventUrl = '/api/v1/events';
-    private $server = 'localhost';
+    private $statsdServer = 'localhost';
 
-    private $datadogHost;
     private $apiKey;
     private $applicationKey;
 
@@ -25,11 +25,26 @@ class StatsdClient
     private $curl;
 
 
-    public function __construct($host, $apiKey, $appKey)
+    public function __construct($apiKey, $appKey)
     {
-        $this->datadogHost = $host;
         $this->apiKey = $apiKey;
         $this->applicationKey = $appKey;
+    }
+
+    /**
+     * @param string
+     */
+    public function setDatadogHost($host)
+    {
+        $this->datadogHost = $host;
+    }
+
+    /**
+     * @param string - host name or IP address (better)
+     */
+    public function setStatsdServer($server)
+    {
+        $this->statsdServer = $server;
     }
 
     /**
@@ -203,7 +218,7 @@ class StatsdClient
                 $value .= '|#' . $tags;
             }
 
-            socket_sendto($socket, "$stat:$value", strlen("$stat:$value"), 0, $this->server, 8125);
+            socket_sendto($socket, "$stat:$value", strlen("$stat:$value"), 0, $this->statsdServer, 8125);
         }
 
         socket_close($socket);
