@@ -211,15 +211,15 @@ class DatadogClient
         $packets = $this->preparePackets($data, $sampleRate, $tags);
 
         // Non - Blocking UDP I/O - Use IP Addresses!
-        $socket = socket_create(AF_INET, SOCK_DGRAM, SOL_UDP);
-        socket_set_nonblock($socket);
+        $socket = fsockopen('udp://' . $this->statsdServer, 8125, $errno, $error);
+        stream_set_blocking($socket, 0);
 
         foreach ($packets as $packet)
         {
-            socket_sendto($socket, $packet, strlen($packet), 0, $this->statsdServer, 8125);
+            fwrite($socket, $packet);
         }
 
-        socket_close($socket);
+        fclose($socket);
 
         return $packets;
     }
