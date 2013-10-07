@@ -19,6 +19,10 @@ class DatadogClient
     private $apiKey;
     private $applicationKey;
 
+    /** @var array tags for all stats (eg. controler/action name) */
+    private $tags = array();
+
+    /** @var array started timings */
     private $timings = array();
 
     /** @var resource cURL multi handler */
@@ -56,13 +60,23 @@ class DatadogClient
     }
 
     /**
+     * Set shared tags for all stats
+     *
+     * @param array
+     */
+    public function setTags(array $tags)
+    {
+        $this->tags = $tags;
+    }
+
+    /**
      * Log timing information
      *
      * @param string - the metric to in log timing info for
      * @param float - the ellapsed time (ms) to log
      * @param float - the rate (0-1) for sampling
      */
-    public function timing($stat, $time, $sampleRate = 1, array $tags = null)
+    public function timing($stat, $time, $sampleRate = 1, array $tags = array())
     {
         $this->send(array($stat => "$time|ms"), $sampleRate, $tags);
     }
@@ -74,7 +88,7 @@ class DatadogClient
      * @param float - the rate (0-1) for sampling
      * @param array - optional tags for the metric
      */
-    public function startTiming($stat, $sampleRate = 1, array $tags = null)
+    public function startTiming($stat, $sampleRate = 1, array $tags = array())
     {
         $this->timings[$stat] = array(
             'start' => microtime(true),
@@ -105,8 +119,9 @@ class DatadogClient
      * @param string - the metric
      * @param float - the value
      * @param float - the rate (0-1) for sampling
+     * @param array - optional tags for the metric
      */
-    public function gauge($stat, $value, $sampleRate = 1, array $tags = null)
+    public function gauge($stat, $value, $sampleRate = 1, array $tags = array())
     {
         $this->send(array($stat => "$value|g"), $sampleRate, $tags);
     }
@@ -117,8 +132,9 @@ class DatadogClient
      * @param string - the metric
      * @param float - the value
      * @param float - the rate (0-1) for sampling
+     * @param array - optional tags for the metric
      */
-    public function histogram($stat, $value, $sampleRate = 1, array $tags = null)
+    public function histogram($stat, $value, $sampleRate = 1, array $tags = array())
     {
         $this->send(array($stat => "$value|h"), $sampleRate, $tags);
     }
@@ -129,21 +145,22 @@ class DatadogClient
      * @param string - the metric
      * @param float - the value
      * @param float - the rate (0-1) for sampling
+     * @param array - optional tags for the metric
      */
-    public function set($stat, $value, $sampleRate = 1, array $tags = null)
+    public function set($stat, $value, $sampleRate = 1, array $tags = array())
     {
         $this->send(array($stat => "$value|s"), $sampleRate, $tags);
     }
-
 
     /**
      * Increments one or more stats counters (eg. page-view)
      *
      * @param string|array - the metric(s) to increment
      * @param float - the rate (0-1) for sampling
+     * @param array - optional tags for the metric
      * @return bool
      */
-    public function increment($stats, $sampleRate = 1, array $tags = null)
+    public function increment($stats, $sampleRate = 1, array $tags = array())
     {
         $this->updateStats($stats, 1, $sampleRate, $tags);
     }
@@ -153,9 +170,10 @@ class DatadogClient
      *
      * @param string|array - the metric(s) to decrement
      * @param float - the rate (0-1) for sampling
+     * @param array - optional tags for the metric
      * @return bool
      */
-    public function decrement($stats, $sampleRate = 1, array $tags = null)
+    public function decrement($stats, $sampleRate = 1, array $tags = array())
     {
         $this->updateStats($stats, -1, $sampleRate, $tags);
     }
@@ -166,10 +184,10 @@ class DatadogClient
      * @param string|array - the metric(s) to update. Should be either a string or array of metrics
      * @param int - the amount to increment/decrement each metric by
      * @param float - the rate (0-1) for sampling
-     * @param array|string - key Value array of Tag => Value, or single tag as string
+     * @param array - key Value array of Tag => Value
      * @return bool
      */
-    public function updateStats($stats, $delta = 1, $sampleRate = 1, array $tags = null)
+    public function updateStats($stats, $delta = 1, $sampleRate = 1, array $tags = array())
     {
         if (!is_array($stats)) {
             $stats = array($stats);
@@ -189,9 +207,9 @@ class DatadogClient
      *
      * @param array - incoming Data
      * @param float - the rate (0-1) for sampling
-     * @param array|string - key-value array of Tag => Value, or single tag as string
+     * @param array - key-value array of Tag => Value
      */
-    protected function send($data, $sampleRate = 1, array $tags = null)
+    protected function send($data, $sampleRate = 1, array $tags = array())
     {
         // sampling
         $sampledData = array();
@@ -214,23 +232,34 @@ class DatadogClient
         $socket = socket_create(AF_INET, SOCK_DGRAM, SOL_UDP);
         socket_set_nonblock($socket);
 
+        $tagString = $this->serializeTags($tags);
+
         foreach ($sampledData as $stat => $value) {
-            if ($tags !== NULL && is_array($tags) && count($tags) > 0) {
-                $value .= '|';
-
-                foreach ($tags as $tag_key => $tag_val) {
-                    $value .= '#' . $tag_key . ':' . $tag_val . ',';
-                }
-
-                $value = substr($value, 0, -1);
-            } elseif (isset($tags) && !empty($tags)) {
-                $value .= '|#' . $tags;
+            if ($tagString)
+            {
+                $value .= '|#' . $tagString;
             }
 
             socket_sendto($socket, "$stat:$value", strlen("$stat:$value"), 0, $this->statsdServer, 8125);
         }
 
         socket_close($socket);
+    }
+
+    /**
+     * @param array
+     * @return string
+     */
+    private function serializeTags($tags)
+    {
+        $tags = array_merge($tags, $this->tags);
+        $values = array();
+        foreach ($tags as $name => $value)
+        {
+            $values = $value === TRUE ? $name : "$name:$value";
+        }
+
+        return implode(',', $values);
     }
 
     /**
