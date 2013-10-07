@@ -4,7 +4,16 @@
     "description": "An extremely simple PHP DataDog Statsd and events client",
 	"license": "BSD-3-Clause",
     "keywords": ["DataDog", "PHP"],
+
 	"require": {
 		"php": ">= 5.3.0"
+	},
+	"require-dev": {
+		"nette/nette": "@dev",
+		"nette/tester": "@dev"
+	},
+
+	"autoload": {
+		"classmap": ["src/"]
 	}
 }
