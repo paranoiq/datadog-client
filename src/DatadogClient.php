@@ -31,6 +31,14 @@ class DatadogClient
         $this->applicationKey = $appKey;
     }
 
+    public function __destruct()
+    {
+        if ($this->timings)
+        {
+            trigger_error('DatadogClient: some timings were not properly ended.');
+        }
+    }
+
     /**
      * @param string
      */
@@ -50,9 +58,9 @@ class DatadogClient
     /**
      * Log timing information
      *
-     * @param string - the metric to in log timing info for.
+     * @param string - the metric to in log timing info for
      * @param float - the ellapsed time (ms) to log
-     * @param float - the rate (0-1) for sampling.
+     * @param float - the rate (0-1) for sampling
      */
     public function timing($stat, $time, $sampleRate = 1, array $tags = null)
     {
@@ -62,7 +70,7 @@ class DatadogClient
     /**
      * Start a timing log
      *
-     * @param string - the metric to log timing info for.
+     * @param string - the metric to log timing info for
      * @param float - the rate (0-1) for sampling
      * @param array - optional tags for the metric
      */
@@ -78,24 +86,25 @@ class DatadogClient
     /**
      * End a timing log and send to statsd
      *
-     * @param string - the metric to log timing info for.
+     * @param string - the metric to log timing info for
      */
     public function endTiming($stat)
     {
         if (isset($this->timings[$stat])) {
             $timing = $this->timings[$stat];
             $this->timing($stat, microtime(true) - $timing['start'], $timing['sampleRate'], $timing['tags']);
+            unset($this->timings[$stat]);
         } else {
-            throw new \Exception("Timing '" . $stat . "' has not been started");
+            throw new DatadogClientException("Timing '" . $stat . "' has not been started");
         }
     }
 
     /**
-     * Gauge
+     * Gauge (eg. disk space, free memory...)
      *
      * @param string - the metric
      * @param float - the value
-     * @param float - the rate (0-1) for sampling.
+     * @param float - the rate (0-1) for sampling
      */
     public function gauge($stat, $value, $sampleRate = 1, array $tags = null)
     {
@@ -103,11 +112,11 @@ class DatadogClient
     }
 
     /**
-     * Histogram
+     * Histogram (eg. process time, process used memory...)
      *
      * @param string - the metric
      * @param float - the value
-     * @param float - the rate (0-1) for sampling.
+     * @param float - the rate (0-1) for sampling
      */
     public function histogram($stat, $value, $sampleRate = 1, array $tags = null)
     {
@@ -115,11 +124,11 @@ class DatadogClient
     }
 
     /**
-     * Set
+     * Set of unique values (eg. unique user ids...)
      *
      * @param string - the metric
      * @param float - the value
-     * @param float - the rate (0-1) for sampling.
+     * @param float - the rate (0-1) for sampling
      */
     public function set($stat, $value, $sampleRate = 1, array $tags = null)
     {
@@ -128,10 +137,10 @@ class DatadogClient
 
 
     /**
-     * Increments one or more stats counters
+     * Increments one or more stats counters (eg. page-view)
      *
-     * @param string|array - the metric(s) to increment.
-     * @param float - the rate (0-1) for sampling.
+     * @param string|array - the metric(s) to increment
+     * @param float - the rate (0-1) for sampling
      * @return bool
      */
     public function increment($stats, $sampleRate = 1, array $tags = null)
@@ -140,10 +149,10 @@ class DatadogClient
     }
 
     /**
-     * Decrements one or more stats counters.
+     * Decrements one or more stats counters
      *
-     * @param string|array - the metric(s) to decrement.
-     * @param float - the rate (0-1) for sampling.
+     * @param string|array - the metric(s) to decrement
+     * @param float - the rate (0-1) for sampling
      * @return bool
      */
     public function decrement($stats, $sampleRate = 1, array $tags = null)
@@ -152,11 +161,11 @@ class DatadogClient
     }
 
     /**
-     * Updates one or more stats counters by arbitrary amounts.
+     * Updates one or more stats counters by arbitrary amounts
      *
-     * @param string|array - the metric(s) to update. Should be either a string or array of metrics.
-     * @param int - the amount to increment/decrement each metric by.
-     * @param float - the rate (0-1) for sampling.
+     * @param string|array - the metric(s) to update. Should be either a string or array of metrics
+     * @param int - the amount to increment/decrement each metric by
+     * @param float - the rate (0-1) for sampling
      * @param array|string - key Value array of Tag => Value, or single tag as string
      * @return bool
      */
@@ -179,7 +188,7 @@ class DatadogClient
      * Squirt the metrics over UDP
      *
      * @param array - incoming Data
-     * @param float - the rate (0-1) for sampling.
+     * @param float - the rate (0-1) for sampling
      * @param array|string - key-value array of Tag => Value, or single tag as string
      */
     protected function send($data, $sampleRate = 1, array $tags = null)
@@ -226,7 +235,7 @@ class DatadogClient
 
     /**
      * Send an event to the Datadog HTTP api. Potentially slow, so avoid
-     * making many call in a row if you don't want to stall your app.
+     * making many call in a row if you don't want to stall your app
      * Requires PHP >= 5.3.0 and the PECL extension pecl_http
      *
      * @param string - Title of the event
@@ -288,5 +297,11 @@ class DatadogClient
 
         // do not wait for results
     }
+
+}
+
+
+class DatadogClientException extends \LogicException
+{
 
 }
