@@ -78,7 +78,7 @@ class DatadogClient
      */
     public function timing($stat, $time, $sampleRate = 1, array $tags = array())
     {
-        $this->send(array($stat => "$time|ms"), $sampleRate, $tags);
+        return $this->send(array($stat => "$time|ms"), $sampleRate, $tags);
     }
 
     /**
@@ -106,8 +106,8 @@ class DatadogClient
     {
         if (isset($this->timings[$stat])) {
             $timing = $this->timings[$stat];
-            $this->timing($stat, microtime(true) - $timing['start'], $timing['sampleRate'], $timing['tags']);
             unset($this->timings[$stat]);
+            return $this->timing($stat, microtime(true) - $timing['start'], $timing['sampleRate'], $timing['tags']);
         } else {
             throw new DatadogClientException("Timing '" . $stat . "' has not been started");
         }
@@ -123,7 +123,7 @@ class DatadogClient
      */
     public function gauge($stat, $value, $sampleRate = 1, array $tags = array())
     {
-        $this->send(array($stat => "$value|g"), $sampleRate, $tags);
+        return $this->send(array($stat => "$value|g"), $sampleRate, $tags);
     }
 
     /**
@@ -136,7 +136,7 @@ class DatadogClient
      */
     public function histogram($stat, $value, $sampleRate = 1, array $tags = array())
     {
-        $this->send(array($stat => "$value|h"), $sampleRate, $tags);
+        return $this->send(array($stat => "$value|h"), $sampleRate, $tags);
     }
 
     /**
@@ -149,7 +149,7 @@ class DatadogClient
      */
     public function set($stat, $value, $sampleRate = 1, array $tags = array())
     {
-        $this->send(array($stat => "$value|s"), $sampleRate, $tags);
+        return $this->send(array($stat => "$value|s"), $sampleRate, $tags);
     }
 
     /**
@@ -158,11 +158,10 @@ class DatadogClient
      * @param string|array - the metric(s) to increment
      * @param float - the rate (0-1) for sampling
      * @param array - optional tags for the metric
-     * @return bool
      */
     public function increment($stats, $sampleRate = 1, array $tags = array())
     {
-        $this->updateStats($stats, 1, $sampleRate, $tags);
+        return $this->updateStats($stats, 1, $sampleRate, $tags);
     }
 
     /**
@@ -171,11 +170,10 @@ class DatadogClient
      * @param string|array - the metric(s) to decrement
      * @param float - the rate (0-1) for sampling
      * @param array - optional tags for the metric
-     * @return bool
      */
     public function decrement($stats, $sampleRate = 1, array $tags = array())
     {
-        $this->updateStats($stats, -1, $sampleRate, $tags);
+        return $this->updateStats($stats, -1, $sampleRate, $tags);
     }
 
     /**
@@ -185,7 +183,6 @@ class DatadogClient
      * @param int - the amount to increment/decrement each metric by
      * @param float - the rate (0-1) for sampling
      * @param array - key Value array of Tag => Value
-     * @return bool
      */
     public function updateStats($stats, $delta = 1, $sampleRate = 1, array $tags = array())
     {
@@ -199,7 +196,7 @@ class DatadogClient
             $data[$stat] = "$delta|c";
         }
 
-        $this->send($data, $sampleRate, $tags);
+        return $this->send($data, $sampleRate, $tags);
     }
 
     /**
@@ -210,6 +207,32 @@ class DatadogClient
      * @param array - key-value array of Tag => Value
      */
     protected function send($data, $sampleRate = 1, array $tags = array())
+    {
+        $packets = $this->preparePackets($data, $sampleRate, $tags);
+
+        // Non - Blocking UDP I/O - Use IP Addresses!
+        $socket = socket_create(AF_INET, SOCK_DGRAM, SOL_UDP);
+        socket_set_nonblock($socket);
+
+        foreach ($packets as $packet)
+        {
+            socket_sendto($socket, $packet, strlen($packet), 0, $this->statsdServer, 8125);
+        }
+
+        socket_close($socket);
+
+        return $packets;
+    }
+
+    /**
+     * Formats packets for sending
+     *
+     * @param array
+     * @param float - the rate (0-1) for sampling
+     * @param array - key-value array of Tag => Value
+     * @return string[]
+     */
+    public function preparePackets($data, $sampleRate = 1, array $tags = array())
     {
         // sampling
         $sampledData = array();
@@ -225,38 +248,39 @@ class DatadogClient
         }
 
         if (empty($sampledData)) {
-            return;
+            return array();
         }
-
-        // Non - Blocking UDP I/O - Use IP Addresses!
-        $socket = socket_create(AF_INET, SOCK_DGRAM, SOL_UDP);
-        socket_set_nonblock($socket);
 
         $tagString = $this->serializeTags($tags);
 
+        $packets = array();
         foreach ($sampledData as $stat => $value) {
+            $packet = $stat . ':' . $value;
             if ($tagString)
             {
-                $value .= '|#' . $tagString;
+                $packet .= '|#' . $tagString;
             }
-
-            socket_sendto($socket, "$stat:$value", strlen("$stat:$value"), 0, $this->statsdServer, 8125);
+            $packets[] = $packet;
         }
 
-        socket_close($socket);
+        return $packets;
     }
 
     /**
      * @param array
      * @return string
      */
-    private function serializeTags($tags)
+    public function serializeTags($tags)
     {
         $tags = array_merge($tags, $this->tags);
         $values = array();
         foreach ($tags as $name => $value)
         {
-            $values = $value === TRUE ? $name : "$name:$value";
+            if (str_replace(array('|', ',', ':', '@', '#'), '', $name . $value) !== $name . $value)
+            {
+                throw new DatadogClientException('Invalid characters in tags. Do not use any of these: "|,:@#".');
+            }
+            $values[] = $value === TRUE ? $name : "$name:$value";
         }
 
         return implode(',', $values);
@@ -330,7 +354,7 @@ class DatadogClient
 }
 
 
-class DatadogClientException extends \LogicException
+class DatadogClientException extends \Exception
 {
 
 }
